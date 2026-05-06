@@ -1,0 +1,5 @@
+name: account
+version: 0.1.0
+description: "Standalone /account slash command for Hermes account and quota visibility."
+author: OpenAI Codex
+
