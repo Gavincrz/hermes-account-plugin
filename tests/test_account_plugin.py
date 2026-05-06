@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from agent.account_usage import AccountUsageSnapshot, AccountUsageWindow
 from account_plugin import (
+    _parse_args,
     _fetch_snapshot,
     _resolve_target,
     handle_account_command,
@@ -53,30 +54,58 @@ def test_fetch_snapshot_routes_zai_to_plugin_fetch(monkeypatch):
     assert snapshot.plan == "Pro"
 
 
+def test_parse_args_supports_lang_override(monkeypatch):
+    monkeypatch.setattr(
+        "account_plugin._plugin_language_from_config",
+        lambda: "en",
+    )
+
+    opts = _parse_args("zai --lang zh")
+
+    assert opts.provider == "zai"
+    assert opts.language == "zh"
+
+
 def test_handle_account_command_formats_snapshot(monkeypatch):
     monkeypatch.setattr(
         "account_plugin._resolve_target",
         lambda requested: type("Target", (), {
-            "provider": "openrouter",
-            "base_url": "https://openrouter.ai/api/v1",
+            "provider": "zai",
+            "base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
             "api_key": "key-123",
         })(),
     )
     monkeypatch.setattr(
         "account_plugin._fetch_snapshot",
         lambda target: AccountUsageSnapshot(
-            provider="openrouter",
-            source="credits_api",
+            provider="zai",
+            source="quota_api",
             fetched_at=datetime.now(timezone.utc),
             windows=(
-                AccountUsageWindow(label="API key quota", used_percent=30.0),
+                AccountUsageWindow(label="Weekly", used_percent=30.0),
             ),
-            details=("Credits balance: $12.34",),
+            details=("MCP usage: search-prime 12 • web-reader 3",),
         ),
     )
 
-    output = handle_account_command("")
+    output = handle_account_command("zai --lang zh")
 
-    assert "Account limits" in output
-    assert "Provider: openrouter" in output
-    assert "Credits balance: $12.34" in output
+    assert "账户额度" in output
+    assert "提供方：`zai`" in output
+    assert "每周：剩余 70%" in output
+    assert "MCP 使用明细" in output
+
+
+def test_handle_account_command_rejects_unsupported_provider(monkeypatch):
+    monkeypatch.setattr(
+        "account_plugin._resolve_target",
+        lambda requested: type("Target", (), {
+            "provider": "openai-codex",
+            "base_url": "https://chatgpt.com/backend-api/codex",
+            "api_key": "key-123",
+        })(),
+    )
+
+    output = handle_account_command("openai-codex")
+
+    assert "not supported yet" in output
