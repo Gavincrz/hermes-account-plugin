@@ -4,6 +4,7 @@ from agent.account_usage import AccountUsageSnapshot, AccountUsageWindow
 from account_plugin import (
     _parse_args,
     _fetch_snapshot,
+    _resolve_quota_url,
     _resolve_target,
     handle_account_command,
 )
@@ -109,3 +110,115 @@ def test_handle_account_command_rejects_unsupported_provider(monkeypatch):
     output = handle_account_command("openai-codex")
 
     assert "not supported yet" in output or "暂不支持" in output
+
+
+def test_resolve_quota_url_returns_zhipu_for_bigmodel():
+    assert _resolve_quota_url("https://open.bigmodel.cn/api/coding/paas/v4") == "https://bigmodel.cn/api/monitor/usage/quota/limit"
+
+
+def test_resolve_quota_url_returns_zai_for_zai_domain():
+    assert _resolve_quota_url("https://api.z.ai/v4") == "https://api.z.ai/api/monitor/usage/quota/limit"
+
+
+def test_resolve_quota_url_returns_zai_for_unknown():
+    assert _resolve_quota_url("https://unknown.example.com") == "https://api.z.ai/api/monitor/usage/quota/limit"
+
+
+def test_resolve_quota_url_does_not_match_substring_in_path():
+    assert _resolve_quota_url("https://evil.com/bigmodel.cn/path") == "https://api.z.ai/api/monitor/usage/quota/limit"
+
+
+def test_fetch_zai_uses_zhipu_url_for_bigmodel_base(monkeypatch):
+    captured_url = {}
+
+    def fake_resolve_runtime(**kwargs):
+        return {
+            "provider": "zai",
+            "base_url": "https://open.bigmodel.cn/api/coding/paas/v4",
+            "api_key": "test-key",
+        }
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "success": True,
+                "data": {
+                    "limits": [],
+                },
+            }
+
+        def raise_for_status(self):
+            pass
+
+    class FakeClient:
+        def __init__(self, timeout=None):
+            pass
+
+        def get(self, url, **kwargs):
+            captured_url["url"] = url
+            return FakeResponse()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("account_plugin.resolve_runtime_provider", fake_resolve_runtime)
+    monkeypatch.setattr("account_plugin.httpx.Client", FakeClient)
+
+    from account_plugin import _fetch_zai_account_usage
+
+    _fetch_zai_account_usage(None, None)
+
+    assert captured_url["url"] == "https://bigmodel.cn/api/monitor/usage/quota/limit"
+
+
+def test_fetch_zai_uses_zai_url_for_zai_base(monkeypatch):
+    captured_url = {}
+
+    def fake_resolve_runtime(**kwargs):
+        return {
+            "provider": "zai",
+            "base_url": "https://api.z.ai/v4",
+            "api_key": "test-key",
+        }
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "success": True,
+                "data": {
+                    "limits": [],
+                },
+            }
+
+        def raise_for_status(self):
+            pass
+
+    class FakeClient:
+        def __init__(self, timeout=None):
+            pass
+
+        def get(self, url, **kwargs):
+            captured_url["url"] = url
+            return FakeResponse()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr("account_plugin.resolve_runtime_provider", fake_resolve_runtime)
+    monkeypatch.setattr("account_plugin.httpx.Client", FakeClient)
+
+    from account_plugin import _fetch_zai_account_usage
+
+    _fetch_zai_account_usage(None, None)
+
+    assert captured_url["url"] == "https://api.z.ai/api/monitor/usage/quota/limit"

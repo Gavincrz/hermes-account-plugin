@@ -15,7 +15,14 @@ from hermes_cli.config import load_config
 from hermes_cli.runtime_provider import resolve_runtime_provider
 from utils import base_url_host_matches
 
-ZAI_QUOTA_URL = "https://api.z.ai/api/monitor/usage/quota/limit"
+_ZAI_QUOTA_URL = "https://api.z.ai/api/monitor/usage/quota/limit"
+_ZHIPU_QUOTA_URL = "https://bigmodel.cn/api/monitor/usage/quota/limit"
+
+
+def _resolve_quota_url(base_url: str) -> str:
+    if base_url_host_matches(base_url, "bigmodel.cn"):
+        return _ZHIPU_QUOTA_URL
+    return _ZAI_QUOTA_URL
 _PROVIDER_ALIASES = {
     "glm": "zai",
     "z-ai": "zai",
@@ -245,8 +252,10 @@ def _fetch_zai_account_usage(
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
     }
+    resolved_base_url = str(runtime.get("base_url") or "").strip()
+    quota_url = _resolve_quota_url(resolved_base_url)
     with httpx.Client(timeout=15.0) as client:
-        response = client.get(ZAI_QUOTA_URL, headers=headers)
+        response = client.get(quota_url, headers=headers)
         response.raise_for_status()
 
     payload = response.json() or {}
