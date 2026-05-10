@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -104,14 +104,14 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _title_case_slug(value: Optional[str]) -> Optional[str]:
+def _title_case_slug(value: str | None) -> str | None:
     cleaned = str(value or "").strip()
     if not cleaned:
         return None
     return cleaned.replace("_", " ").replace("-", " ").title()
 
 
-def _parse_dt(value: Any) -> Optional[datetime]:
+def _parse_dt(value: Any) -> datetime | None:
     if value in (None, ""):
         return None
     if isinstance(value, (int, float)):
@@ -130,12 +130,12 @@ def _parse_dt(value: Any) -> Optional[datetime]:
     return None
 
 
-def _normalize_provider(value: Optional[str]) -> str:
+def _normalize_provider(value: str | None) -> str:
     normalized = str(value or "").strip().lower()
     return _PROVIDER_ALIASES.get(normalized, normalized)
 
 
-def _normalize_language(value: Optional[str]) -> str:
+def _normalize_language(value: str | None) -> str:
     normalized = str(value or "").strip().lower()
     return _LANG_ALIASES.get(normalized, "")
 
@@ -203,7 +203,7 @@ def _resolve_provider_from_config() -> str:
     return ""
 
 
-def _resolve_target(requested_provider: str) -> Optional[ResolvedAccountTarget]:
+def _resolve_target(requested_provider: str) -> ResolvedAccountTarget | None:
     requested = _normalize_provider(requested_provider) or "auto"
     runtime: dict[str, Any] = {}
     try:
@@ -229,9 +229,9 @@ def _resolve_target(requested_provider: str) -> Optional[ResolvedAccountTarget]:
 
 
 def _fetch_zai_account_usage(
-    base_url: Optional[str],
-    api_key: Optional[str],
-) -> Optional[AccountUsageSnapshot]:
+    base_url: str | None,
+    api_key: str | None,
+) -> AccountUsageSnapshot | None:
     runtime = resolve_runtime_provider(
         requested="zai",
         explicit_base_url=base_url,
@@ -253,9 +253,9 @@ def _fetch_zai_account_usage(
     data = payload.get("data") or {}
     limits = data.get("limits") or []
 
-    window_5h: Optional[AccountUsageWindow] = None
-    window_weekly: Optional[AccountUsageWindow] = None
-    window_mcp: Optional[AccountUsageWindow] = None
+    window_5h: AccountUsageWindow | None = None
+    window_weekly: AccountUsageWindow | None = None
+    window_mcp: AccountUsageWindow | None = None
     details: list[str] = []
 
     for limit in limits:
@@ -318,7 +318,7 @@ def _fetch_zai_account_usage(
     )
 
 
-def _fetch_snapshot(target: ResolvedAccountTarget) -> Optional[AccountUsageSnapshot]:
+def _fetch_snapshot(target: ResolvedAccountTarget) -> AccountUsageSnapshot | None:
     if target.provider == "zai":
         return _fetch_zai_account_usage(target.base_url, target.api_key)
     return fetch_core_account_usage(

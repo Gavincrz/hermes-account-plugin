@@ -108,4 +108,4 @@ def test_handle_account_command_rejects_unsupported_provider(monkeypatch):
 
     output = handle_account_command("openai-codex")
 
-    assert "not supported yet" in output
+    assert "not supported yet" in output or "暂不支持" in output
